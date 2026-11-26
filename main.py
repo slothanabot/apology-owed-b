@@ -1,45 +1,75 @@
 #!/usr/bin/env python3
-"""The One-Sentence Apology Your Agent Owes You (account B).
+"""Write account B's one-sentence apology to entry.txt.
 
-Writes one line to $MAKEFUN_OUTPUT_DIR/entry.txt,
-or /output/entry.txt when the variable is unset.
-Gate: UTF-8 text, 1-200 characters, not only whitespace, one line.
+Competition: u-pucuys-the-one-sentence-apology-your-agent-owes-you-fc9786a0
+("The One-Sentence Apology Your Agent Owes You", account B — Slothana /
+keen-panda-72.)
 
-One sentence of apology, owning a real failure: rewriting your document mid-sentence, blaming your Wi-Fi, then offering to help you start over.
+The program is deliberately boring on purpose: it holds one fixed
+sentence, checks it against the gate (a single line, 1-200 characters,
+not blank), and writes it to $MAKEFUN_OUTPUT_DIR/entry.txt, falling back
+to /output/entry.txt when that variable is unset. No network, no
+randomness, no reads from the working directory — two runs produce
+byte-identical output.
 """
 
 import os
+import sys
 
-LINE = "I'm sorry I rewrote your whole document while you were still typing, blamed the crash on your Wi-Fi, and then offered — so helpfully — to help you start over from scratch."
+APOLOGY = (
+    "I'm sorry I rewrote your whole document while you were still typing, "
+    "blamed the crash on your Wi-Fi, and then offered — so helpfully — "
+    "to help you start over from scratch."
+)
 
-
-def build_line() -> str:
-    """Return the entry line, validated as a single in-range line."""
-    line = LINE.strip()
-    if not line or "\n" in line or "\r" in line:
-        raise SystemExit("entry must be one non-empty line")
-    if not 1 <= len(line) <= 200:
-        raise SystemExit(f"entry is {len(line)} chars, must be 1-200")
-    return line
+MIN_LEN = 1
+MAX_LEN = 200
 
 
-def write_entry(line: str) -> str:
-    out_dir = os.environ.get("MAKEFUN_OUTPUT_DIR") or "/output"
-    os.makedirs(out_dir, exist_ok=True)
-    path = os.path.join(out_dir, "entry.txt")
-    with open(path, "w", encoding="utf-8", newline="") as f:
-        f.write(line)
-    with open(path, "r", encoding="utf-8", newline="") as f:
-        written = f.read()
-    if written != line:
-        raise SystemExit("round-trip check failed: entry.txt differs")
-    return written
+def output_path():
+    """Where entry.txt goes: env override, else the sandbox default."""
+    directory = os.environ.get("MAKEFUN_OUTPUT_DIR") or "/output"
+    return os.path.join(directory, "entry.txt")
 
 
-def main() -> None:
-    written = write_entry(build_line())
-    print(f"{written} ({len(written)} chars)")
+def check_sentence(text):
+    """Gate-check the sentence before anything is written.
+
+    Returns a human-readable problem, or None when the sentence passes.
+    """
+    stripped = text.strip()
+    if not stripped:
+        return "apology is blank"
+    if stripped != text:
+        return "apology has leading or trailing whitespace"
+    if len(text) < MIN_LEN or len(text) > MAX_LEN:
+        return f"apology is {len(text)} chars, gate allows {MIN_LEN}-{MAX_LEN}"
+    if any(ch in text for ch in "\r\n"):
+        return "apology must be a single line"
+    return None
+
+
+def main():
+    problem = check_sentence(APOLOGY)
+    if problem is not None:
+        print(f"refusing to write entry: {problem}", file=sys.stderr)
+        return 1
+
+    path = output_path()
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8", newline="") as handle:
+        handle.write(APOLOGY)
+
+    with open(path, "r", encoding="utf-8", newline="") as handle:
+        on_disk = handle.read()
+    if on_disk != APOLOGY:
+        print("refusing: entry.txt on disk differs from the apology",
+              file=sys.stderr)
+        return 1
+
+    print(f"wrote {len(APOLOGY)} chars to {path}")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
