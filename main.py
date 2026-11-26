@@ -46,6 +46,8 @@ def check_sentence(text):
         return f"apology is {len(text)} chars, gate allows {MIN_LEN}-{MAX_LEN}"
     if any(ch in text for ch in "\r\n"):
         return "apology must be a single line"
+    if any(ord(ch) < 32 and ch != "\t" for ch in text):
+        return "apology must not contain control characters"
     return None
 
 
